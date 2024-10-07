@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: disable-motd-news
+  namespace: kube-system  # You can choose another namespace if needed
+spec:
+  selector:
+    matchLabels:
+      name: disable-motd-news
+  template:
+    metadata:
+      labels:
+        name: disable-motd-news
+    spec:
+      hostPID: true
+      containers:
+      - name: disable-motd-news
+        image: ubuntu:20.04  # Or another version suitable for your AKS nodes
+        securityContext:
+          privileged: true  # Required to run system-level commands
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          # Disable motd-news service
+          if [ -f /etc/systemd/system/multi-user.target.wants/motd-news.timer ]; then
+            systemctl stop motd-news
+            systemctl disable motd-news
+          fi
+
+          # Disable MOTD news fetching by setting ENABLED=0
+          if grep -q 'ENABLED=1' /etc/default/motd-news; then
+            sed -i 's/ENABLED=1/ENABLED=0/' /etc/default/motd-news
+          fi
+
+          # Keep the container running long enough to apply the changes
+          sleep 60
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /
